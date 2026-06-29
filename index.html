@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Build Converter</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101215;
+      --panel: #171b20;
+      --line: #2a3038;
+      --text: #edf2f7;
+      --muted: #9ba8b5;
+      --accent: #55d6be;
+      --accent-2: #5ca9ff;
+      --danger: #ff6b6b;
+      --field: #0d1014;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif;
+    }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #14181d;
+    }
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    #status {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(300px, 390px) 1fr;
+      min-height: 0;
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      padding: 14px;
+      overflow: auto;
+    }
+    .workspace {
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+      min-width: 0;
+      min-height: 0;
+    }
+    .drop {
+      min-height: 152px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed #52606d;
+      background: #11161b;
+      cursor: pointer;
+      text-align: center;
+      padding: 18px;
+    }
+    .drop.drag {
+      border-color: var(--accent);
+      background: #10201f;
+    }
+    .drop strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    .drop span, .hint, .small {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .fieldHead {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .info {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #11161b;
+      color: var(--accent);
+      cursor: help;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .info:focus {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+    }
+    .tip {
+      display: none;
+    }
+    .floatingTip {
+      position: fixed;
+      z-index: 1000;
+      width: min(260px, calc(100vw - 16px));
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0f13;
+      color: var(--text);
+      box-shadow: 0 10px 24px rgba(0,0,0,.4);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.35;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .08s ease;
+    }
+    .floatingTip.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    input, select, button {
+      width: 100%;
+      min-height: 36px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: var(--field);
+      color: var(--text);
+      padding: 7px 9px;
+      font: inherit;
+    }
+    input[type="checkbox"] {
+      width: 16px;
+      min-height: 16px;
+      padding: 0;
+      accent-color: var(--accent);
+    }
+    input[type="range"] {
+      padding: 0;
+      accent-color: var(--accent);
+    }
+    .check {
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      min-height: 36px;
+    }
+    .wide { grid-column: 1 / -1; }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #06100e;
+    }
+    button.secondary {
+      background: #1b242d;
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .6;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 10px;
+      min-width: 0;
+    }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .metric strong {
+      display: block;
+      font-size: 20px;
+      margin-top: 2px;
+      word-break: break-word;
+    }
+    .output {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr minmax(260px, 340px);
+      gap: 14px;
+    }
+    .log, .files {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 6px;
+      min-height: 0;
+      overflow: auto;
+    }
+    pre {
+      margin: 0;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 12px/1.45 Consolas, ui-monospace, monospace;
+      color: #d6dee8;
+    }
+    .files {
+      padding: 10px;
+    }
+    .fileLink {
+      display: block;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      text-decoration: none;
+      margin-bottom: 8px;
+      background: #11161b;
+      word-break: break-word;
+    }
+    .fileLink:hover { border-color: var(--accent-2); }
+    .error { color: var(--danger); }
+    @media (max-width: 900px) {
+      main, .output { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>3D Build Converter</h1>
+      <div id="status">Ready</div>
+    </header>
+    <main>
+      <aside>
+        <div id="drop" class="drop">
+          <input id="fileInput" type="file" accept=".zip,.glb,.gltf,.obj,.stl,.ply" hidden>
+          <div>
+            <strong id="dropTitle">Drop model or ZIP</strong>
+            <span>.zip, .glb, .gltf, .obj, .stl, .ply</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <label class="wide">
+            <span class="fieldHead">3d_models folder <span class="info" tabindex="0">i<span class="tip">Pick a model that is already saved inside the 3d_models folder.</span></span></span>
+            <select id="modelSelect"></select>
+          </label>
+          <label>
+            <span class="fieldHead">Cell size <span class="info" tabindex="0">i<span class="tip">Block detail size. Smaller is smoother but makes way more blocks. Bigger is faster and rougher.</span></span></span>
+            <input id="cell" type="number" min="0.01" step="0.005" value="0.075">
+          </label>
+          <label>
+            <span class="fieldHead">Fit shrink <span class="info" tabindex="0">i<span class="tip">Scales the model down after fitting it to the build area. 1 is biggest, 5 is medium, 10 is small.</span></span></span>
+            <input id="shrink" type="range" min="1" max="20" step="0.1" value="5">
+          </label>
+          <label>
+            <span class="fieldHead">Shrink value <span class="info" tabindex="0">i<span class="tip">Exact number for the Fit shrink slider. Lower makes the build bigger, higher makes it smaller.</span></span></span>
+            <input id="shrinkValue" type="number" min="1" max="20" step="0.1" value="5">
+          </label>
+          <label>
+            <span class="fieldHead">Split cap <span class="info" tabindex="0">i<span class="tip">Maximum blocks per .build file. If the build has more blocks, it creates part001, part002, and so on.</span></span></span>
+            <input id="splitSize" type="number" min="1" step="1000" value="150000">
+          </label>
+          <label>
+            <span class="fieldHead">Surface overlap <span class="info" tabindex="0">i<span class="tip">Slightly overlaps triangle strips to hide holes. 1.03 is light, 1.08 is normal, too high can look chunky.</span></span></span>
+            <input id="surfaceOverlap" type="number" min="1" step="0.01" value="1.08">
+          </label>
+          <label>
+            <span class="fieldHead">Color merge <span class="info" tabindex="0">i<span class="tip">Lets close colors count as the same color. 0 is exact colors, 12 is default, higher can reduce color accuracy.</span></span></span>
+            <input id="mergeTolerance" type="number" min="0" step="1" value="12">
+          </label>
+          <label>
+            <span class="fieldHead">Face fill <span class="info" tabindex="0">i<span class="tip">How many strips fill each triangle face. Higher fills smoother but makes more blocks.</span></span></span>
+            <input id="faceFill" type="number" min="0.1" step="0.1" value="2">
+          </label>
+          <label>
+            <span class="fieldHead">Small detail boost <span class="info" tabindex="0">i<span class="tip">Adds extra strips on tiny triangle faces like hands/fingers. 1 is normal, 2 helps holes, 3+ uses a lot more blocks.</span></span></span>
+            <input id="smallDetailBoost" type="number" min="1" max="6" step="0.25" value="1">
+          </label>
+          <label>
+            <span class="fieldHead">Fill radius <span class="info" tabindex="0">i<span class="tip">Mostly for blocky voxel mode. 0 is fewer blocks, 1 fills small holes, 2+ can get bulky.</span></span></span>
+            <input id="fillRadius" type="number" min="0" step="1" value="1">
+          </label>
+          <label>
+            <span class="fieldHead">Rotate X <span class="info" tabindex="0">i<span class="tip">Turns the model forward/back before converting. Try 90 or -90 if the model is lying down.</span></span></span>
+            <input id="rotX" type="number" step="5" value="0">
+          </label>
+          <label>
+            <span class="fieldHead">Rotate Y <span class="info" tabindex="0">i<span class="tip">Turns the model left/right before converting. Try 180 if it faces backwards.</span></span></span>
+            <input id="rotY" type="number" step="5" value="0">
+          </label>
+          <label>
+            <span class="fieldHead">Rotate Z <span class="info" tabindex="0">i<span class="tip">Spins the model around the vertical screen axis before converting. Try 90 for sideways models.</span></span></span>
+            <input id="rotZ" type="number" step="5" value="0">
+          </label>
+          <label class="check">
+            <input id="surfaceSlabs" type="checkbox" checked>
+            <span>Smooth triangles</span>
+            <span class="info" tabindex="0">i<span class="tip">Usually keep on. Builds thin triangle strips so surfaces are filled instead of looking like dots.</span></span>
+          </label>
+          <label class="check">
+            <input id="mergeTriangleQuads" type="checkbox">
+            <span>Merge square pairs</span>
+            <span class="info" tabindex="0">i<span class="tip">Can reduce blocks by merging matching triangle pairs, but can create ugly overlapping plates. Best off for most models.</span></span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="convertBtn" class="primary" type="button">Convert</button>
+          <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <div class="summary">
+          <div class="metric"><span>Blocks</span><strong id="blocks">0</strong></div>
+          <div class="metric"><span>Files</span><strong id="fileCount">0</strong></div>
+          <div class="metric"><span>Faces</span><strong id="faces">0</strong></div>
+          <div class="metric"><span>Seconds</span><strong id="seconds">0</strong></div>
+        </div>
+        <div class="output">
+          <div class="log"><pre id="log">Waiting.</pre></div>
+          <div class="files" id="files"><div class="hint">Outputs appear here.</div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let pickedFile = null;
+    const floatingTip = document.createElement("div");
+    floatingTip.className = "floatingTip";
+    document.body.append(floatingTip);
+
+    function fmt(n) {
+      return Number(n || 0).toLocaleString();
+    }
+
+    function setStatus(text) {
+      $("status").textContent = text;
+    }
+
+    function log(text, isError = false) {
+      $("log").className = isError ? "error" : "";
+      $("log").textContent = text || "";
+    }
+
+    function showTip(info) {
+      const text = info.querySelector(".tip")?.textContent || "";
+      if (!text) return;
+      floatingTip.textContent = text;
+      floatingTip.classList.add("show");
+      const rect = info.getBoundingClientRect();
+      const gap = 8;
+      const tipRect = floatingTip.getBoundingClientRect();
+      let left = rect.left + rect.width / 2 - tipRect.width / 2;
+      left = Math.max(gap, Math.min(window.innerWidth - tipRect.width - gap, left));
+      let top = rect.bottom + gap;
+      if (top + tipRect.height + gap > window.innerHeight) {
+        top = rect.top - tipRect.height - gap;
+      }
+      top = Math.max(gap, Math.min(window.innerHeight - tipRect.height - gap, top));
+      floatingTip.style.left = `${left}px`;
+      floatingTip.style.top = `${top}px`;
+    }
+
+    function hideTip() {
+      floatingTip.classList.remove("show");
+    }
+
+    function settings() {
+      return {
+        cell: Number($("cell").value),
+        shrink: Number($("shrinkValue").value),
+        split_size: Number($("splitSize").value),
+        surface_overlap: Number($("surfaceOverlap").value),
+        merge_tolerance: Number($("mergeTolerance").value),
+        face_fill: Number($("faceFill").value),
+        small_detail_boost: Number($("smallDetailBoost").value),
+        fill_radius: Number($("fillRadius").value),
+        rot_x: Number($("rotX").value),
+        rot_y: Number($("rotY").value),
+        rot_z: Number($("rotZ").value),
+        surface_slabs: $("surfaceSlabs").checked,
+        merge_triangle_quads: $("mergeTriangleQuads").checked
+      };
+    }
+
+    async function loadModels(preferredName = null) {
+      const res = await fetch("/api/models");
+      const data = await res.json();
+      const select = $("modelSelect");
+      const wanted = preferredName ?? select.value;
+      select.innerHTML = "";
+      if (!data.models.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No folder models yet";
+        select.append(option);
+        return;
+      }
+      for (const model of data.models) {
+        const option = document.createElement("option");
+        option.value = model.name;
+        option.textContent = `${model.new ? "NEW - " : ""}${model.name}`;
+        select.append(option);
+      }
+      if (wanted && [...select.options].some((option) => option.value === wanted)) {
+        select.value = wanted;
+      }
+    }
+
+    function appendModelSource(fd) {
+      const folderModel = $("modelSelect").value;
+      const sourceName = pickedFile ? pickedFile.name : folderModel;
+      if (pickedFile) {
+        fd.append("file", pickedFile, pickedFile.name);
+      } else {
+        fd.append("model", folderModel);
+      }
+      return sourceName;
+    }
+
+    function setPickedFile(file) {
+      pickedFile = file;
+      $("dropTitle").textContent = file ? `Upload: ${file.name}` : "Drop model or ZIP";
+      if (file) {
+        setStatus(`Upload selected: ${file.name}`);
+      }
+    }
+
+    async function convert() {
+      const fd = new FormData();
+      const folderModel = $("modelSelect").value;
+      const sourceName = appendModelSource(fd);
+      fd.append("settings", JSON.stringify(settings()));
+      $("convertBtn").disabled = true;
+      setStatus(`Converting: ${sourceName}`);
+      log(`Converting: ${sourceName}`);
+      $("files").innerHTML = "";
+      try {
+        const res = await fetch("/api/convert", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "conversion failed");
+        $("blocks").textContent = fmt(data.blocks);
+        $("fileCount").textContent = fmt(data.files.length);
+        $("faces").textContent = fmt(data.faces);
+        $("seconds").textContent = Number(data.seconds || 0).toFixed(1);
+        log((data.logs || []).join("\n"));
+        const box = $("files");
+        box.innerHTML = "";
+        for (const file of data.files) {
+          const a = document.createElement("a");
+          a.className = "fileLink";
+          a.href = file.url;
+          a.textContent = file.name;
+          box.append(a);
+        }
+        if (!data.files.length) box.innerHTML = '<div class="hint">No files written.</div>';
+        setPickedFile(null);
+        const convertedName = (data.input || "").split(/[\\/]/).pop() || folderModel;
+        await loadModels(convertedName);
+        setStatus(`Done: ${convertedName}`);
+      } catch (err) {
+        log(String(err.message || err), true);
+        setStatus("Error");
+      } finally {
+        $("convertBtn").disabled = false;
+      }
+    }
+
+    $("drop").addEventListener("click", () => $("fileInput").click());
+    $("fileInput").addEventListener("change", (event) => setPickedFile(event.target.files[0] || null));
+    $("modelSelect").addEventListener("change", () => {
+      pickedFile = null;
+      $("fileInput").value = "";
+      $("dropTitle").textContent = "Drop model or ZIP";
+      setStatus(`Folder selected: ${$("modelSelect").value}`);
+      log(`Ready to convert folder model:\n${$("modelSelect").value}`);
+    });
+    for (const name of ["dragenter", "dragover"]) {
+      $("drop").addEventListener(name, (event) => {
+        event.preventDefault();
+        $("drop").classList.add("drag");
+      });
+    }
+    for (const name of ["dragleave", "drop"]) {
+      $("drop").addEventListener(name, (event) => {
+        event.preventDefault();
+        $("drop").classList.remove("drag");
+      });
+    }
+    $("drop").addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files[0];
+      if (file) setPickedFile(file);
+    });
+    $("shrink").addEventListener("input", () => $("shrinkValue").value = $("shrink").value);
+    $("shrinkValue").addEventListener("input", () => $("shrink").value = $("shrinkValue").value);
+    $("convertBtn").addEventListener("click", convert);
+    $("refreshBtn").addEventListener("click", loadModels);
+    document.querySelectorAll(".info").forEach((info) => {
+      info.addEventListener("mouseenter", () => showTip(info));
+      info.addEventListener("mousemove", () => showTip(info));
+      info.addEventListener("focus", () => showTip(info));
+      info.addEventListener("mouseleave", hideTip);
+      info.addEventListener("blur", hideTip);
+    });
+    window.addEventListener("scroll", hideTip, true);
+    window.addEventListener("resize", hideTip);
+    loadModels().catch((err) => log(String(err), true));
+  </script>
+</body>
+</html>
