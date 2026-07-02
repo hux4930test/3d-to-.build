@@ -183,6 +183,28 @@
       min-height: 36px;
     }
     .wide { grid-column: 1 / -1; }
+    .robloxTools {
+      margin-top: 14px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #12171d;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .robloxTools label {
+      min-width: 0;
+    }
+    .robloxTools button {
+      width: auto;
+      min-width: 132px;
+      white-space: nowrap;
+    }
+    .robloxTools .small {
+      grid-column: 1 / -1;
+    }
     .actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -234,7 +256,7 @@
       grid-template-columns: 1fr minmax(260px, 340px);
       gap: 14px;
     }
-    .log, .files {
+    .log, .files, .preview {
       border: 1px solid var(--line);
       background: var(--panel);
       border-radius: 6px;
@@ -252,6 +274,78 @@
     .files {
       padding: 10px;
     }
+    .sideRail {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+    }
+    .preview {
+      padding: 10px;
+      overflow: visible;
+    }
+    .previewHead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .previewHead strong {
+      font-size: 13px;
+    }
+    .previewActions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .previewGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .previewCheck {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .previewCheck input {
+      width: auto;
+    }
+    .previewFrame {
+      min-height: 220px;
+      aspect-ratio: 1;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #0b0f13;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .previewFrame.dragging {
+      cursor: grabbing;
+    }
+    .previewFrame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .fileRow {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: stretch;
+      margin-bottom: 8px;
+    }
     .fileLink {
       display: block;
       padding: 9px 10px;
@@ -259,9 +353,14 @@
       border-radius: 6px;
       color: var(--text);
       text-decoration: none;
-      margin-bottom: 8px;
       background: #11161b;
       word-break: break-word;
+    }
+    .previewBtn {
+      width: auto;
+      min-width: 74px;
+      padding-inline: 10px;
+      background: #1b242d;
     }
     .fileLink:hover { border-color: var(--accent-2); }
     .error { color: var(--danger); }
@@ -269,6 +368,8 @@
       main, .output { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
       .summary { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .robloxTools { grid-template-columns: 1fr; }
+      .robloxTools button { width: 100%; }
     }
   </style>
 </head>
@@ -281,11 +382,20 @@
     <main>
       <aside>
         <div id="drop" class="drop">
-          <input id="fileInput" type="file" accept=".zip,.glb,.gltf,.obj,.stl,.ply" hidden>
+          <input id="fileInput" type="file" accept=".zip,.glb,.gltf,.obj,.stl,.ply,.rbxlx,.rbxmx" hidden>
           <div>
             <strong id="dropTitle">Drop model or ZIP</strong>
-            <span>.zip, .glb, .gltf, .obj, .stl, .ply</span>
+            <span>.zip, .glb, .gltf, .obj, .stl, .ply, .rbxlx, .rbxmx</span>
           </div>
+        </div>
+
+        <div class="robloxTools">
+          <label>
+            <span class="fieldHead">Roblox avatar <span class="info" tabindex="0">i<span class="tip">Creates a simplified 3D avatar model from the public Roblox username/avatar data and saves it into the 3d_models folder.</span></span></span>
+            <input id="robloxUsername" type="text" maxlength="32" placeholder="username">
+          </label>
+          <button id="makeRobloxUserBtn" class="secondary" type="button">Make Avatar</button>
+          <div class="small">Studio files: drop .rbxlx or .rbxmx files here, or put them in the 3d_models folder.</div>
         </div>
 
         <div class="controls">
@@ -298,12 +408,12 @@
             <input id="cell" type="number" min="0.01" step="0.005" value="0.075">
           </label>
           <label>
-            <span class="fieldHead">Fit shrink <span class="info" tabindex="0">i<span class="tip">Scales the model down after fitting it to the build area. 1 is biggest, 5 is medium, 10 is small.</span></span></span>
-            <input id="shrink" type="range" min="1" max="20" step="0.1" value="5">
+            <span class="fieldHead">Fit shrink <span class="info" tabindex="0">i<span class="tip">Scales the model down after fitting it to the build area. 0.5 is bigger, 5 is medium, 20+ is smaller.</span></span></span>
+            <input id="shrink" type="range" min="0.05" max="100" step="0.05" value="5">
           </label>
           <label>
-            <span class="fieldHead">Shrink value <span class="info" tabindex="0">i<span class="tip">Exact number for the Fit shrink slider. Lower makes the build bigger, higher makes it smaller.</span></span></span>
-            <input id="shrinkValue" type="number" min="1" max="20" step="0.1" value="5">
+            <span class="fieldHead">Shrink value <span class="info" tabindex="0">i<span class="tip">Exact number for Fit shrink. Lower makes the build bigger, higher makes it smaller. Roblox files use this too.</span></span></span>
+            <input id="shrinkValue" type="number" min="0.05" max="1000" step="0.05" value="5">
           </label>
           <label>
             <span class="fieldHead">Split cap <span class="info" tabindex="0">i<span class="tip">Maximum blocks per .build file. If the build has more blocks, it creates part001, part002, and so on.</span></span></span>
@@ -312,6 +422,18 @@
           <label>
             <span class="fieldHead">Surface overlap <span class="info" tabindex="0">i<span class="tip">Slightly overlaps triangle strips to hide holes. 1.03 is light, 1.08 is normal, too high can look chunky.</span></span></span>
             <input id="surfaceOverlap" type="number" min="1" step="0.01" value="1.08">
+          </label>
+          <label>
+            <span class="fieldHead">Roblox slope drop <span class="info" tabindex="0">i<span class="tip">Legacy setting for older WedgePart slope mode. Current Roblox wedges export as exact closed 0.1-thick shells from the rotated wedge vertices, so this usually does not need changing.</span></span></span>
+            <input id="robloxSlopeDrop" type="number" min="0" step="0.1" value="0.5">
+          </label>
+          <label>
+            <span class="fieldHead">Roblox wedge fill <span class="info" tabindex="0">i<span class="tip">Only for normal Roblox WedgePart terrain slopes. Gives skinny terrain wedges a minimum width measured in cell sizes. 2 is default, 3+ is stronger, 0 is old hairline width.</span></span></span>
+            <input id="robloxWedgeFill" type="number" min="0" step="0.25" value="2">
+          </label>
+          <label>
+            <span class="fieldHead">Roblox terrain detail <span class="info" tabindex="0">i<span class="tip">1-3 keeps thin 0.01 wedge strip shells with denser end strips. Thin disks/rings use 11 clumped bands. Long cylinders use centered planks through to the other side. Broken chunky cylinders fall back to one long cube.</span></span></span>
+            <input id="robloxTerrainDetail" type="number" min="0.25" max="10" step="0.25" value="1">
           </label>
           <label>
             <span class="fieldHead">Color merge <span class="info" tabindex="0">i<span class="tip">Lets close colors count as the same color. 0 is exact colors, 12 is default, higher can reduce color accuracy.</span></span></span>
@@ -347,9 +469,14 @@
             <span class="info" tabindex="0">i<span class="tip">Usually keep on. Builds thin triangle strips so surfaces are filled instead of looking like dots.</span></span>
           </label>
           <label class="check">
-            <input id="mergeTriangleQuads" type="checkbox">
+            <input id="robloxPrimitives" type="checkbox" checked>
+            <span>Roblox primitive shapes</span>
+            <span class="info" tabindex="0">i<span class="tip">When on, Roblox cylinders, rings, cones, and spheres use special shape conversion. Turn off to export them as simple box blocks instead.</span></span>
+          </label>
+          <label class="check">
+            <input id="mergeTriangleQuads" type="checkbox" checked>
             <span>Merge square pairs</span>
-            <span class="info" tabindex="0">i<span class="tip">Can reduce blocks by merging matching triangle pairs, but can create ugly overlapping plates. Best off for most models.</span></span>
+            <span class="info" tabindex="0">i<span class="tip">Merges two matching triangles into one flat rectangle only when they form a clean square/rectangle side.</span></span>
           </label>
         </div>
 
@@ -368,7 +495,25 @@
         </div>
         <div class="output">
           <div class="log"><pre id="log">Waiting.</pre></div>
-          <div class="files" id="files"><div class="hint">Outputs appear here.</div></div>
+          <div class="sideRail">
+            <div class="preview">
+              <div class="previewHead">
+                <strong>Build preview</strong>
+                <div class="previewActions">
+                  <button id="renderSelectedBtn" class="previewBtn" type="button" disabled>Render</button>
+                  <button id="renderAllBtn" class="previewBtn" type="button" disabled>Render all</button>
+                </div>
+              </div>
+              <div class="previewGrid">
+                <label>Az <input id="renderAz" type="number" step="5" value="45"></label>
+                <label>El <input id="renderEl" type="number" step="5" value="28"></label>
+                <label>Zoom <input id="renderDist" type="number" min="0.25" max="5" step="0.05" value="1.15"></label>
+                <label class="previewCheck"><input id="renderCpu" type="checkbox"> CPU preview <span class="info" tabindex="0">i<span class="tip">Off tries GPU/OpenGL first. On forces the multi-core CPU preview renderer, useful if Windows or Remote Desktop breaks OpenGL.</span></span></label>
+              </div>
+              <div id="previewFrame" class="previewFrame"><div class="hint">Select a build file.</div></div>
+            </div>
+            <div class="files" id="files"><div class="hint">Outputs appear here.</div></div>
+          </div>
         </div>
       </section>
     </main>
@@ -377,6 +522,13 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let pickedFile = null;
+    let selectedBuildUrl = "";
+    let generatedBuildUrls = [];
+    let activeRenderUrls = [];
+    let previewObjectUrl = "";
+    let previewAbort = null;
+    let previewTimer = 0;
+    let previewDrag = null;
     const floatingTip = document.createElement("div");
     floatingTip.className = "floatingTip";
     document.body.append(floatingTip);
@@ -392,6 +544,129 @@
     function log(text, isError = false) {
       $("log").className = isError ? "error" : "";
       $("log").textContent = text || "";
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function setPreviewMessage(text) {
+      if (previewObjectUrl) {
+        URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = "";
+      }
+      $("previewFrame").innerHTML = `<div class="hint">${text}</div>`;
+    }
+
+    function previewTarget() {
+      if (activeRenderUrls.length) return activeRenderUrls;
+      return selectedBuildUrl ? [selectedBuildUrl] : [];
+    }
+
+    function queueRender(delay = 250) {
+      if (!previewTarget().length) return;
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(() => renderBuild(), delay);
+    }
+
+    async function renderBuild(urls) {
+      let fileUrls;
+      if (urls === undefined) {
+        fileUrls = previewTarget();
+      } else if (Array.isArray(urls)) {
+        fileUrls = urls.filter(Boolean);
+      } else {
+        fileUrls = urls ? [urls] : [];
+      }
+      if (!fileUrls.length) {
+        setPreviewMessage("Select a build file.");
+        return;
+      }
+      activeRenderUrls = fileUrls.slice();
+      selectedBuildUrl = fileUrls[0];
+      if (previewAbort) previewAbort.abort();
+      const controller = new AbortController();
+      previewAbort = controller;
+      $("renderSelectedBtn").disabled = true;
+      $("renderAllBtn").disabled = true;
+      setStatus(fileUrls.length > 1 ? `Rendering ${fileUrls.length} build files` : "Rendering preview");
+      setPreviewMessage("Rendering...");
+      try {
+        const params = new URLSearchParams();
+        for (const fileUrl of fileUrls) params.append("file", fileUrl);
+        params.set("az", $("renderAz").value || "45");
+        params.set("el", $("renderEl").value || "28");
+        params.set("dist", $("renderDist").value || "1.15");
+        params.set("cpu", $("renderCpu")?.checked ? "1" : "0");
+        const res = await fetch(`/api/render-build?${params.toString()}`, { signal: controller.signal });
+        if (!res.ok) {
+          let message = await res.text();
+          try { message = JSON.parse(message).error || message; } catch {}
+          throw new Error(message || "render failed");
+        }
+        const blob = await res.blob();
+        if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = URL.createObjectURL(blob);
+        const img = document.createElement("img");
+        img.alt = "Rendered build preview";
+        img.src = previewObjectUrl;
+        $("previewFrame").innerHTML = "";
+        $("previewFrame").append(img);
+        setStatus("Preview ready");
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        setPreviewMessage(String(err.message || err));
+        setStatus("Preview error");
+      } finally {
+        $("renderSelectedBtn").disabled = !selectedBuildUrl;
+        $("renderAllBtn").disabled = !generatedBuildUrls.length;
+        if (previewAbort === controller) previewAbort = null;
+      }
+    }
+
+    function startPreviewDrag(event) {
+      if (!previewTarget().length) return;
+      previewDrag = {
+        x: event.clientX,
+        y: event.clientY,
+        az: Number($("renderAz").value) || 0,
+        el: Number($("renderEl").value) || 0,
+        moved: false
+      };
+      $("previewFrame").classList.add("dragging");
+      $("previewFrame").setPointerCapture?.(event.pointerId);
+    }
+
+    function movePreviewDrag(event) {
+      if (!previewDrag) return;
+      const dx = event.clientX - previewDrag.x;
+      const dy = event.clientY - previewDrag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) previewDrag.moved = true;
+      $("renderAz").value = Math.round((previewDrag.az + dx * 0.35) * 10) / 10;
+      $("renderEl").value = Math.round(clamp(previewDrag.el - dy * 0.25, -85, 85) * 10) / 10;
+      queueRender(450);
+    }
+
+    function endPreviewDrag(event) {
+      if (!previewDrag) return;
+      const shouldClickRender = !previewDrag.moved;
+      previewDrag = null;
+      $("previewFrame").classList.remove("dragging");
+      $("previewFrame").releasePointerCapture?.(event.pointerId);
+      if (shouldClickRender) {
+        renderBuild();
+      } else {
+        queueRender(30);
+      }
+    }
+
+    function zoomPreview(event) {
+      if (!previewTarget().length) return;
+      event.preventDefault();
+      const current = Number($("renderDist").value) || 1.15;
+      const next = current * (event.deltaY > 0 ? 1.12 : 0.89);
+      $("renderDist").value = clamp(next, 0.25, 5).toFixed(2);
+      queueRender(160);
     }
 
     function showTip(info) {
@@ -423,6 +698,9 @@
         shrink: Number($("shrinkValue").value),
         split_size: Number($("splitSize").value),
         surface_overlap: Number($("surfaceOverlap").value),
+        roblox_slope_drop: Number($("robloxSlopeDrop").value),
+        roblox_wedge_fill: Number($("robloxWedgeFill").value),
+        roblox_terrain_detail: Number($("robloxTerrainDetail").value),
         merge_tolerance: Number($("mergeTolerance").value),
         face_fill: Number($("faceFill").value),
         small_detail_boost: Number($("smallDetailBoost").value),
@@ -431,6 +709,7 @@
         rot_y: Number($("rotY").value),
         rot_z: Number($("rotZ").value),
         surface_slabs: $("surfaceSlabs").checked,
+        roblox_primitives: $("robloxPrimitives").checked,
         merge_triangle_quads: $("mergeTriangleQuads").checked
       };
     }
@@ -478,6 +757,36 @@
       }
     }
 
+    async function makeRobloxUserModel() {
+      const username = $("robloxUsername").value.trim();
+      if (!username) {
+        log("Enter a Roblox username first.", true);
+        setStatus("Username needed");
+        return;
+      }
+      const fd = new FormData();
+      fd.append("username", username);
+      $("makeRobloxUserBtn").disabled = true;
+      setStatus(`Making Roblox avatar: ${username}`);
+      log(`Making Roblox avatar 3D model:\n${username}`);
+      try {
+        const res = await fetch("/api/roblox-user", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "avatar model failed");
+        setPickedFile(null);
+        $("fileInput").value = "";
+        await loadModels(data.output);
+        $("modelSelect").value = data.output;
+        log(`Saved Roblox avatar model:\n${data.output}\n\nPress Convert to turn it into .build files.`);
+        setStatus(`Avatar model saved: ${data.output}`);
+      } catch (err) {
+        log(String(err.message || err), true);
+        setStatus("Avatar model error");
+      } finally {
+        $("makeRobloxUserBtn").disabled = false;
+      }
+    }
+
     async function convert() {
       const fd = new FormData();
       const folderModel = $("modelSelect").value;
@@ -487,6 +796,12 @@
       setStatus(`Converting: ${sourceName}`);
       log(`Converting: ${sourceName}`);
       $("files").innerHTML = "";
+      selectedBuildUrl = "";
+      generatedBuildUrls = [];
+      activeRenderUrls = [];
+      $("renderSelectedBtn").disabled = true;
+      $("renderAllBtn").disabled = true;
+      setPreviewMessage("Outputs appear here.");
       try {
         const res = await fetch("/api/convert", { method: "POST", body: fd });
         const data = await res.json();
@@ -498,12 +813,28 @@
         log((data.logs || []).join("\n"));
         const box = $("files");
         box.innerHTML = "";
+        generatedBuildUrls = data.files.map((file) => file.url);
         for (const file of data.files) {
+          const row = document.createElement("div");
+          row.className = "fileRow";
           const a = document.createElement("a");
           a.className = "fileLink";
           a.href = file.url;
           a.textContent = file.name;
-          box.append(a);
+          const button = document.createElement("button");
+          button.className = "previewBtn";
+          button.type = "button";
+          button.textContent = "Render";
+          button.addEventListener("click", () => renderBuild(file.url));
+          row.append(a, button);
+          box.append(row);
+          if (!selectedBuildUrl) {
+            selectedBuildUrl = file.url;
+            activeRenderUrls = [file.url];
+            $("renderSelectedBtn").disabled = false;
+            $("renderAllBtn").disabled = !generatedBuildUrls.length;
+            setPreviewMessage(generatedBuildUrls.length > 1 ? "Press Render or Render all." : "Press Render.");
+          }
         }
         if (!data.files.length) box.innerHTML = '<div class="hint">No files written.</div>';
         setPickedFile(null);
@@ -546,6 +877,21 @@
     $("shrink").addEventListener("input", () => $("shrinkValue").value = $("shrink").value);
     $("shrinkValue").addEventListener("input", () => $("shrink").value = $("shrinkValue").value);
     $("convertBtn").addEventListener("click", convert);
+    $("renderSelectedBtn").addEventListener("click", () => renderBuild(selectedBuildUrl));
+    $("renderAllBtn").addEventListener("click", () => renderBuild(generatedBuildUrls));
+    $("renderAz").addEventListener("input", () => queueRender(450));
+    $("renderEl").addEventListener("input", () => queueRender(450));
+    $("renderDist").addEventListener("input", () => queueRender(450));
+    $("renderCpu").addEventListener("change", () => queueRender(120));
+    $("previewFrame").addEventListener("pointerdown", startPreviewDrag);
+    $("previewFrame").addEventListener("pointermove", movePreviewDrag);
+    $("previewFrame").addEventListener("pointerup", endPreviewDrag);
+    $("previewFrame").addEventListener("pointercancel", endPreviewDrag);
+    $("previewFrame").addEventListener("wheel", zoomPreview, { passive: false });
+    $("makeRobloxUserBtn").addEventListener("click", makeRobloxUserModel);
+    $("robloxUsername").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") makeRobloxUserModel();
+    });
     $("refreshBtn").addEventListener("click", loadModels);
     document.querySelectorAll(".info").forEach((info) => {
       info.addEventListener("mouseenter", () => showTip(info));
